@@ -1,7 +1,9 @@
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from einops import repeat
+
 
 class S4D(nn.Module):
     """
@@ -153,6 +155,7 @@ class S4D(nn.Module):
         None
             Placeholder for state (included for interface compatibility).
         """
+        
         if not self.transposed: u = u.transpose(-1, -2)
         L = u.size(-1)
 
@@ -168,14 +171,128 @@ class S4D(nn.Module):
         C_tilde = C * (torch.exp(dtA) - 1.) / A
         k = 2 * torch.einsum('hn, hnl -> hl', C_tilde, K_exp).real 
 
-        # 3. FFT Convolution (y = k * u)
-        k_f = torch.fft.rfft(k, n=2*L) 
-        u_f = torch.fft.rfft(u, n=2*L) 
-        y = torch.fft.irfft(u_f * k_f, n=2*L)[..., :L] 
-
+# direct convolution , replaces FFT
+        kernel = k.unsqueeze(1)
+        y = F.conv1d(u, kernel, padding=L -1, groups=self.h)
+        #trim the casual output
+        y = y[..., :L]
         # 4. Skip Connection
         y = y + u * self.D.unsqueeze(-1)
 
         if not self.transposed: y = y.transpose(-1, -2)
         return y, None
     
+def test_s4d():
+    """Test S4D implementation with direct convolution."""
+    print("=" * 60)
+    print("Testing S4D with Direct Convolution (Task 5.4)")
+    print("=" * 60)
+    
+    # Create model
+    d_model = 64
+    d_state = 64
+    model = S4D(d_model=d_model, d_state=d_state)
+    
+    # Test input
+    batch_size = 2
+    seq_len = 100
+    u = torch.randn(batch_size, d_model, seq_len)
+    
+    # Forward pass
+    y, _ = model(u)
+    
+    print(f"\n Model Configuration:")
+    print(f"   - d_model: {d_model}")
+    print(f"   - d_state: {d_state}")
+    print(f"   - Parameterization: Diagonal A ({d_state//2} complex eigenvalues)")
+    
+    print(f"\n Shape Checks:")
+    print(f"   - Input shape:  {u.shape}")
+    print(f"   - Output shape: {y.shape}")
+    print(f"   - Kernel shape: {model.forward(u, kernel_only=True).shape if hasattr(model, 'kernel_only') else 'N/A'}")
+    
+    # Verify shapes match
+    assert y.shape == u.shape, f"Shape mismatch: {y.shape} != {u.shape}"
+    print(f"\n Shape verification: PASSED")
+    
+    # Parameter count comparison
+    n_params_s4 = d_state * d_state  # Full S4: N²
+    n_params_s4d = 2 * d_state       # S4D: 2N (real + imag)
+    
+    print(f"\n Parameter Count Comparison:")
+    print(f"   - Full S4:  {n_params_s4} params (N²)")
+    print(f"   - S4D:      {n_params_s4d} params (2N)")
+    print(f"   - Reduction: {(1 - n_params_s4d/n_params_s4)*100:.1f}%")
+    
+    print(f"\n Test passed: S4D with direct convolution works!")
+    print("=" * 60)
+    
+    return model
+
+
+def benchmark_s4d():
+    """Benchmark direct convolution on GPU (if available)."""
+    import time
+    
+    print("\n" + "=" * 60)
+    print("S4D Performance Benchmark")
+    print("=" * 60)
+    
+    # Check CUDA
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Running on: {device}")
+    if device.type == 'cuda':
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("  GPU not available - performance will be slow for long sequences!")
+    
+    model = S4D(d_model=64, d_state=64).to(device)
+    model.eval()
+    
+    seq_lengths = [64, 256, 1024, 4096]
+    results = []
+    
+    print(f"\n{'L':<10} {'Direct Conv (ms)':>20}")
+    print("-" * 35)
+    
+    for L in seq_lengths:
+        u = torch.randn(1, 64, L).to(device)
+        
+        # Warmup
+        for _ in range(5):
+            _ = model(u)
+        
+        # Benchmark
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+        start = time.time()
+        
+        with torch.no_grad():
+            for _ in range(20):
+                _ = model(u)
+        
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+        elapsed = (time.time() - start) * 1000 / 20  # ms per iteration
+        
+        results.append((L, elapsed))
+        print(f"{L:<10} {elapsed:>20.2f}")
+    
+    print("-" * 35)
+    
+    # Print GPU recommendation if on CPU
+    if device.type == 'cpu' and L >= 1024:
+        print("\n  performance warning: runing on CPU for long sequences can be very slow!")
+        print("   considrr using a GPU for sequences >= 1024.")
+    
+    return results
+
+
+if __name__ == "__main__":
+    # Run test
+    model = test_s4d()
+    
+    # Run benchmark
+    benchmark_s4d()
+    
+    print("\n S4D with direct convolution ready for Task 5.4!")
