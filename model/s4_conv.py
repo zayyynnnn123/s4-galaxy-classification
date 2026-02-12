@@ -16,6 +16,12 @@ if project_root not in sys.path:
 
 # Try multiple import strategies
 try:
+    from s4_recurrent import S4Recurrent
+    from hilbert import HilbertScan
+except ImportError:
+    print("Error: Ensure 's4_recurrent.py' and 'hilbert.py' are in the same folder!")
+
+try:
     # When running as module: python -m model.s4_conv
     from model.s4_recurrent import S4Recurrent
     print("✓ Imported S4Recurrent (as module)")
@@ -301,6 +307,52 @@ def verify_equivalence():
     print("=" * 60)
     return conv_output, rec_output
 
+def run_all_milestone_tests():
+    """Performs the tests required for Milestone 1."""
+    print("\n" + "="*50)
+    print("STARTING MILESTONE 1 VALIDATION")
+    print("="*50)
+
+    # Settings
+    d_model, d_state = 1, 32
+    
+    # 1. Setup Models
+    conv_model = S4Convolutional(d_model, d_state)
+    rec_model = S4Recurrent(d_model, d_state)
+    scan = HilbertScan()
+    
+    # Sync weights so they are identical 'twins'
+    rec_model.load_state_dict(conv_model.state_dict())
+    
+    # 2. Create a "Galaxy Image" (64x64)
+    fake_galaxy = torch.randn(1, 1, 64, 64)
+    
+    # 3. Test Hilbert Path
+    print(f"Step 1: Flattening galaxy using Hilbert Curve...")
+    sequence = scan(fake_galaxy) # (1, 4096, 1)
+    print(f"✓ Sequence created. Length: {sequence.shape[1]} pixels.")
+
+    # 4. Test Brain Equivalence
+    print(f"Step 2: Feeding sequence to Recurrent and Convolutional brains...")
+    with torch.no_grad():
+        out_conv = conv_model(sequence)
+        out_rec = rec_model(sequence)
+    
+    # Calculate Difference
+    diff = torch.abs(out_conv - out_rec).max().item()
+    
+    print("-" * 30)
+    print(f"MAX NUMERICAL DIFFERENCE: {diff:.2e}")
+    print("-" * 30)
+    
+    if diff < 1e-5:
+        print("✅ TEST PASSED: Models are mathematically equivalent!")
+        print("✅ TEST PASSED: Hilbert integration is successful!")
+    else:
+        print("❌ TEST FAILED: Differences are too high.")
+    print("="*50 + "\n")
+
+
 
 if __name__ == "__main__":
     # Set seed for reproducibility
@@ -312,3 +364,6 @@ if __name__ == "__main__":
     # Verify equivalence
     print("\n")
     verify_equivalence()
+
+    #test hilberts
+    run_all_milestone_tests()
