@@ -1,3 +1,8 @@
+#--------------------------------------
+#RUN THIS FILE IN UBUNTU WITH THE COMMAND: python -m model.gclassifier
+#there is an error in the test_classifier function, it is not able to find the HilbertScan and S4D classes, make sure to implement those classes in the same directory as this file or adjust the import statements accordingly.
+#---------------------------------------
+
 import torch
 import torch.nn as nn
 
@@ -82,25 +87,142 @@ class GalaxyClassifierS4D(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x, return_logits=False):
-        """
-        Forward pass of the PixelS4Galaxy model.
+        #first we convert the 2D image to a 1D sequence using the Hilbert scan
+        B, C, H, W = x.shape
+        x = self.hilbert_scan(x)  # (B, seq_len, hilbert_channels)
+
+        #now we will project the hilbert scan output to the d_model dimension
+        x = self.uproject(x)  # (B, seq_len, d_model)
+
+        #first S4 layer 
+        x, _ = self.s4_1(x)  # (B, seq_len, d_model)
+        x = self.act1(x)
+
+        #now for second S4 layer
+        x, _ = self.s4_2(x)  # (B, seq_len, d_model)
+        x = self.act2(x)
+
+        #take the last timestep as the summary 
+        x = self.take_last(x)  # (B, d_model)
+        #mapp the summery to the class logits
+
+        logits = self.fc(x)  # (B, num_classes)
+        if return_logits:
+            return logits
+        else:
+            probs = self.softmax(logits)  # (B, num_classes)
+            return probs
         
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor of shape (B, C, 64, 64), where B is the batch size
-            and C is the number of channels (1 for grayscale, 3 for RGB).
-        return_logits : bool, optional
-            If True, returns raw logits instead of softmax probabilities 
-            (default is False).
+
+def test_classifier():
+    """Test the GalaxyClassifierS4D implementation with GPU support."""
+    print("=" * 60)
+    print("Testing GalaxyClassifierS4D (Task 8)")
+    print("=" * 60)
+    
+    # --- GPU Setup ---
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"\n📊 Using device: {device}")
+    if device.type == 'cuda':
+        print(f"   GPU: {torch.cuda.get_device_name(0)}")
+        print(f"   CUDA Version: {torch.version.cuda}")
+    else:
+        print("   ⚠️  Running on CPU - this will be SLOW!")
+        print("   💡 To enable GPU, install PyTorch with CUDA:")
+        print("      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118")
+    
+    # Test with grayscale (colored=False)
+    print("\n📋 Test 1: Grayscale input (colored=False)")
+    model_gray = GalaxyClassifierS4D(colored=False).to(device)
+    x_gray = torch.randn(2, 1, 64, 64).to(device)
+    
+    # Warmup (for GPU)
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+        for _ in range(5):
+            _ = model_gray(x_gray, return_logits=True)
+        torch.cuda.synchronize()
+    
+    # Time the forward pass
+    import time
+    torch.cuda.synchronize() if device.type == 'cuda' else None
+    start = time.time()
+    
+    logits = model_gray(x_gray, return_logits=True)
+    
+    torch.cuda.synchronize() if device.type == 'cuda' else None
+    elapsed = (time.time() - start) * 1000  # ms
+    
+    print(f"   Logits shape: {logits.shape}")
+    print(f"   Forward time: {elapsed:.2f} ms")
+    assert logits.shape == (2, 4), f"Shape mismatch: {logits.shape}"
+    
+    probs = model_gray(x_gray, return_logits=False)
+    print(f"   Probs shape:  {probs.shape}")
+    print(f"   Sum of probs: {probs[0].sum().item():.4f}")
+    print(f"   ✅ Passed!")
+    
+    # Test with RGB (colored=True)
+    print("\n📋 Test 2: RGB input (colored=True)")
+    model_rgb = GalaxyClassifierS4D(colored=True).to(device)
+    x_rgb = torch.randn(2, 3, 64, 64).to(device)
+    
+    torch.cuda.synchronize() if device.type == 'cuda' else None
+    start = time.time()
+    
+    logits = model_rgb(x_rgb, return_logits=True)
+    
+    torch.cuda.synchronize() if device.type == 'cuda' else None
+    elapsed = (time.time() - start) * 1000
+    
+    print(f"   Logits shape: {logits.shape}")
+    print(f"   Forward time: {elapsed:.2f} ms")
+    assert logits.shape == (2, 4), f"Shape mismatch: {logits.shape}"
+    print(f"   ✅ Passed!")
+    
+    # Parameter count
+    print("\n📋 Parameter Count:")
+    total_params = sum(p.numel() for p in model_rgb.parameters())
+    print(f"   Total parameters: {total_params:,}")
+    
+    # Optional: Benchmark different batch sizes
+    print("\n📋 GPU Speed Test:")
+    batch_sizes = [1, 4, 16, 32]
+    print(f"{'Batch':<10} {'Time (ms)':>15} {'Images/sec':>15}")
+    print("-" * 42)
+    
+    for batch_size in batch_sizes:
+        x_bench = torch.randn(batch_size, 3, 64, 64).to(device)
         
-        Returns
-        -------
-        output : torch.Tensor
-            If return_logits=True: Output logits of shape (B, num_classes),
-            representing unnormalized scores for each galaxy class.
-            If return_logits=False: Output probabilities of shape (B, num_classes),
-            representing the softmax probability distribution over classes.
-        """
-        # TODO: Implement the forward pass
-        raise NotImplementedError("Forward method not implemented yet.")
+        # Warmup
+        for _ in range(5):
+            _ = model_rgb(x_bench)
+        
+        torch.cuda.synchronize() if device.type == 'cuda' else None
+        start = time.time()
+        
+        for _ in range(10):
+            _ = model_rgb(x_bench)
+        
+        torch.cuda.synchronize() if device.type == 'cuda' else None
+        elapsed = (time.time() - start) * 1000 / 10  # ms per iteration
+        
+        images_per_sec = batch_size * (1000 / elapsed)
+        print(f"{batch_size:<10} {elapsed:>15.2f} {images_per_sec:>15.1f}")
+    
+    print("\n" + "=" * 60)
+    print("✅ All tests passed! GalaxyClassifierS4D ready for Task 8!")
+    print("=" * 60)
+    
+    return model_rgb
+
+#--------------------------------------
+#RUN THIS FILE IN UBUNTU WITH THE COMMAND: python -m model.gclassifier
+#there is an error in the test_classifier function, it is not able to find the HilbertScan and S4D classes, make sure to implement those classes in the same directory as this file or adjust the import statements accordingly.
+#---------------------------------------
+
+"""
+================================
+If Nividia GPU is available, this test will run on GPU and report the forward pass time in milliseconds. If no GPU is detected, it will run on CPU and warn about the slower performance.
+use this command in terminal to run the test function with GPU support:python -c "from model.gclassifier import test_classifier; test_classifier()"
+"""
