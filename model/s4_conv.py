@@ -330,7 +330,7 @@ def run_all_milestone_tests():
     # 3. Test Hilbert Path
     print(f"Step 1: Flattening galaxy using Hilbert Curve...")
     sequence = scan(fake_galaxy) # (1, 4096, 1)
-    print(f"✓ Sequence created. Length: {sequence.shape[1]} pixels.")
+    print(f" Sequence created. Length: {sequence.shape[1]} pixels.")
 
     # 4. Test Brain Equivalence
     print(f"Step 2: Feeding sequence to Recurrent and Convolutional brains...")
@@ -346,10 +346,10 @@ def run_all_milestone_tests():
     print("-" * 30)
     
     if diff < 1e-5:
-        print("✅ TEST PASSED: Models are mathematically equivalent!")
-        print("✅ TEST PASSED: Hilbert integration is successful!")
+        print(" TEST PASSED: Models are mathematically equivalent!")
+        print(" TEST PASSED: Hilbert integration is successful!")
     else:
-        print("❌ TEST FAILED: Differences are too high.")
+        print(" TEST FAILED: Differences are too high.")
     print("="*50 + "\n")
 
 
