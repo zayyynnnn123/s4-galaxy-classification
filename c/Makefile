@@ -5,8 +5,8 @@
 .PHONY: clean check test_hilbert test_linear test_s4d
 
 # compiler and flags
-CC     = gcc
-CFLAGS = -Wall -Wextra -O2 -I./include
+CC      = gcc
+CFLAGS  = -Wall -Wextra -O2 -I./include
 LDFLAGS = -lm
 
 # build the main demo program linking all layer source files

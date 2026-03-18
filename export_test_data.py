@@ -69,3 +69,35 @@ print("  - model_params/hilbert_scan.indices.bin")
 print("  - data/samples/test_image_rgb.bin")
 print("  - data/samples/hilbert_output.bin")
 print("\nNow run: cd c && make test_hilbert")
+# ---- linear layer test data ----
+# we test the input projection layer (uproject)
+# input shape:  (4096, 3)  -- hilbert scan output
+# output shape: (4096, 64) -- projected to hidden dim
+
+# get the uproject weights and bias from the model
+uproject_weight = model.uproject.weight.detach().numpy().astype(np.float32)
+uproject_bias   = model.uproject.bias.detach().numpy().astype(np.float32)
+
+print(f"UProject weight shape: {uproject_weight.shape}")  # should be (64, 3)
+print(f"UProject bias shape:   {uproject_bias.shape}")    # should be (64,)
+
+# save weights and bias
+uproject_weight.tofile('data/samples/uproject_weight.bin')
+uproject_bias.tofile('data/samples/uproject_bias.bin')
+
+# compute expected output using pytorch
+# input to linear is the hilbert output we already computed
+hilbert_tensor = torch.tensor(hilbert_output).unsqueeze(0)  # (1, 4096, 3)
+with torch.no_grad():
+    linear_output = model.uproject(hilbert_tensor).numpy()
+
+if linear_output.ndim == 3:
+    linear_output = linear_output.squeeze(0)  # (4096, 64)
+
+print(f"Linear output shape: {linear_output.shape}")  # should be (4096, 64)
+linear_output.astype(np.float32).tofile('data/samples/linear_output.bin')
+
+# also save the hilbert output as linear input so C test can load it directly
+hilbert_output.astype(np.float32).tofile('data/samples/linear_input.bin')
+
+print("Saved linear layer test data")
