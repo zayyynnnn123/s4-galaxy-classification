@@ -20,7 +20,7 @@ print(f"Loading model from: {model_path}")
 
 # we need eval mode so dropout and batchnorm behave correctly
 model = GalaxyClassifierS4D(colored=True)
-model.load_state_dict(torch.load(model_path))
+model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
 model.eval()
 print("✅ Model loaded successfully!")
 
