@@ -1,5 +1,4 @@
-/* c/tests/test_linear.c
- * validates the linear layer C implementation against pytorch reference
+/* validates the linear layer C implementation against pytorch reference
  * tests the uproject layer: (4096, 3) --> (4096, 64)
  * run export_test_data.py first to generate the reference files */
 

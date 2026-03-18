@@ -1,4 +1,3 @@
-// c/tests/test_hilbert.c
 // validates the hilbert scan C implementation against python reference output
 // run this after export_test_data.py has been executed from the project root
 

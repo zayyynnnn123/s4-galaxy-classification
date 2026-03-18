@@ -1,4 +1,4 @@
-/* c/src/linear.c
+/*
  * implements the linear (fully connected) layer
  * used twice in the model:
  *   1. input projection: (4096, C) --> (4096, 64)
