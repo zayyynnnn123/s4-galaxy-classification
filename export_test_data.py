@@ -165,3 +165,51 @@ print("  - data/samples/s4d_C.bin")
 print("  - data/samples/s4d_D.bin")
 print("  - data/samples/s4d_input.bin")
 print("  - data/samples/s4d_output.bin")
+
+
+# ---- GELU test data ----
+# input is the s4d output, shape (4096, 64)
+# gelu is applied in-place so output has same shape
+gelu_input = torch.tensor(s4d_output_LH)
+gelu_output = torch.nn.functional.gelu(gelu_input).numpy()
+
+gelu_input.numpy().astype(np.float32).tofile('data/samples/gelu_input.bin')
+gelu_output.astype(np.float32).tofile('data/samples/gelu_output.bin')
+print(f"GELU input shape:  {gelu_input.shape}")
+print(f"GELU output shape: {gelu_output.shape}")
+print("Saved GELU test data")
+
+# ---- TakeLastTimestep test data ----
+# input is gelu output, shape (4096, 64)
+# output is last row, shape (64,)
+tlts_input  = gelu_output
+tlts_output = gelu_output[-1, :]
+
+tlts_input.astype(np.float32).tofile('data/samples/tlts_input.bin')
+tlts_output.astype(np.float32).tofile('data/samples/tlts_output.bin')
+print(f"TLTS input shape:  {tlts_input.shape}")
+print(f"TLTS output shape: {tlts_output.shape}")
+print("Saved TakeLastTimestep test data")
+
+# ---- Softmax test data ----
+# input is fc layer output (logits), shape (4,)
+fc_weight = model.fc.weight.detach().numpy().astype(np.float32)
+fc_bias   = model.fc.bias.detach().numpy().astype(np.float32)
+print(f"FC weight shape: {fc_weight.shape}")
+print(f"FC bias shape:   {fc_bias.shape}")
+
+tlts_tensor = torch.tensor(tlts_output)
+fc_tensor   = tlts_tensor.unsqueeze(0)
+with torch.no_grad():
+    logits = model.fc(fc_tensor).squeeze(0).numpy()
+
+probs = torch.softmax(torch.tensor(logits), dim=0).numpy()
+print(f"Logits shape: {logits.shape}")
+print(f"Probs shape:  {probs.shape}")
+print(f"Probs sum:    {probs.sum():.6f}")
+
+logits.astype(np.float32).tofile('data/samples/softmax_input.bin')
+probs.astype(np.float32).tofile('data/samples/softmax_output.bin')
+fc_weight.tofile('data/samples/fc_weight.bin')
+fc_bias.tofile('data/samples/fc_bias.bin')
+print("Saved Softmax and FC test data")
