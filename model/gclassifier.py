@@ -52,12 +52,16 @@ class GalaxyClassifierS4D(nn.Module):
 
         self.uproject = nn.Linear(self.hilbert_channels, d_model)
 
-        # S4 layers
+        # S4 layers - NOW WITH 3 LAYERS!
         self.s4_1 = S4D(d_model=d_model, d_state=s4_state, transposed=False)
         self.act1 = nn.GELU()
 
         self.s4_2 = S4D(d_model=d_model, d_state=s4_state, transposed=False)
         self.act2 = nn.GELU()
+        
+        # NEW THIRD S4D LAYER
+        self.s4_3 = S4D(d_model=d_model, d_state=s4_state, transposed=False)
+        self.act3 = nn.GELU()
 
         # Take last timestep
         self.take_last = TakeLastTimestep()
@@ -80,9 +84,13 @@ class GalaxyClassifierS4D(nn.Module):
         x, _ = self.s4_1(x)  # (B, seq_len, d_model)
         x = self.act1(x)
 
-        # Now for second S4 layer
+        # Second S4 layer
         x, _ = self.s4_2(x)  # (B, seq_len, d_model)
         x = self.act2(x)
+        
+        # THIRD S4 LAYER - NEW!
+        x, _ = self.s4_3(x)  # (B, seq_len, d_model)
+        x = self.act3(x)
 
         # Take the last timestep as the summary 
         x = self.take_last(x)  # (B, d_model)
@@ -97,7 +105,7 @@ class GalaxyClassifierS4D(nn.Module):
             return probs
     
     # ============================================================
-    # MISSING FUNCTION 1: FLOPs Estimation (Section 8.5)
+    # FLOPs Estimation (Section 8.5) - UPDATED for 3 layers
     # ============================================================
     def get_flops_estimate(self, batch_size=1):
         """
@@ -124,7 +132,7 @@ class GalaxyClassifierS4D(nn.Module):
         # S4D layers: O(L log L · d) each
         log2_L = math.log2(L)
         s4_flops_per_layer = int(L * log2_L * d)
-        s4_flops = 2 * s4_flops_per_layer  # Two S4D layers
+        s4_flops = 3 * s4_flops_per_layer  # THREE S4D layers (updated)
         
         # Classification head: d * classes
         head_flops = d * classes
@@ -142,7 +150,7 @@ class GalaxyClassifierS4D(nn.Module):
         }
     
     # ============================================================
-    # MISSING FUNCTION 2: Forward Pass Trace (Section 8.7)
+    # Forward Pass Trace (Section 8.7) - UPDATED for 3 layers
     # ============================================================
     def trace_forward_pass(self, device='cpu'):
         """
@@ -157,7 +165,7 @@ class GalaxyClassifierS4D(nn.Module):
             Dictionary with shapes at each layer
         """
         print("\n" + "=" * 60)
-        print("GalaxyClassifierS4D Forward Pass Trace")
+        print("GalaxyClassifierS4D Forward Pass Trace (3 Layers)")
         print("=" * 60)
         print(f"Device: {device}")
         
@@ -197,6 +205,16 @@ class GalaxyClassifierS4D(nn.Module):
         shapes['gelu_2'] = tuple(x.shape)
         print(f"After GELU-2: {x.shape}")
         
+        # THIRD S4D LAYER - NEW!
+        x, _ = self.s4_3(x)
+        shapes['s4d_3'] = tuple(x.shape)
+        print(f"After S4D-3: {x.shape}")
+        
+        # Third GELU
+        x = self.act3(x)
+        shapes['gelu_3'] = tuple(x.shape)
+        print(f"After GELU-3: {x.shape}")
+        
         # TakeLastTimestep
         x = self.take_last(x)
         shapes['take_last'] = tuple(x.shape)
@@ -214,12 +232,12 @@ class GalaxyClassifierS4D(nn.Module):
         return shapes
     
     # ============================================================
-    # Parameter Count Analysis (Section 8.4)
+    # Parameter Count Analysis (Section 8.4) - UPDATED for 3 layers
     # ============================================================
     def get_parameter_count(self):
         """Calculate number of trainable parameters by component."""
         print("\n" + "=" * 60)
-        print("Parameter Count Analysis")
+        print("Parameter Count Analysis (3 S4D Layers)")
         print("=" * 60)
         
         total = 0
@@ -244,6 +262,11 @@ class GalaxyClassifierS4D(nn.Module):
         s4d2_params = sum(p.numel() for p in self.s4_2.parameters())
         params['S4D Layer 2'] = s4d2_params
         total += s4d2_params
+        
+        # S4D Layer 3 - NEW!
+        s4d3_params = sum(p.numel() for p in self.s4_3.parameters())
+        params['S4D Layer 3'] = s4d3_params
+        total += s4d3_params
         
         # GELU activations (0 params)
         params['GELU Activations'] = 0
@@ -273,7 +296,7 @@ class GalaxyClassifierS4D(nn.Module):
 def test_classifier():
     """Test the GalaxyClassifierS4D implementation with GPU support."""
     print("=" * 60)
-    print("Testing GalaxyClassifierS4D (Task 8)")
+    print("Testing GalaxyClassifierS4D (Task 8) - 3 Layer Version")
     print("=" * 60)
     
     # --- GPU Setup ---
@@ -346,7 +369,7 @@ def test_classifier():
     print("\n📊 FLOPs Estimation:")
     flops = model_rgb.get_flops_estimate()
     print(f"   Input projection: {flops['input_projection']:,} FLOPs")
-    print(f"   S4D layers:       {flops['s4d_layers']:,} FLOPs")
+    print(f"   S4D layers (3x):  {flops['s4d_layers']:,} FLOPs")
     print(f"   Classification:   {flops['classification_head']:,} FLOPs")
     print(f"   TOTAL:            {flops['total_flops']:,} FLOPs ({flops['total_gflops']:.2f} GFLOPs)")
     
@@ -381,7 +404,7 @@ def test_classifier():
         print(f"{batch_size:<10} {elapsed:>15.2f} {images_per_sec:>15.1f}")
     
     print("\n" + "=" * 60)
-    print("✅ All tests passed! GalaxyClassifierS4D ready for Task 8!")
+    print("✅ All tests passed! GalaxyClassifierS4D (3-layer) ready for Task 8!")
     print("=" * 60)
     
     return model_rgb
@@ -393,15 +416,3 @@ if __name__ == "__main__":
     if __package__ is None:
         __package__ = "model"
     test_classifier()
-
-
-#--------------------------------------
-#RUN THIS FILE IN UBUNTU WITH THE COMMAND: python -m model.gclassifier
-#there is an error in the test_classifier function, it is not able to find the HilbertScan and S4D classes, make sure to implement those classes in the same directory as this file or adjust the import statements accordingly.
-#---------------------------------------
-
-"""
-================================
-If Nividia GPU is available, this test will run on GPU and report the forward pass time in milliseconds. If no GPU is detected, it will run on CPU and warn about the slower performance.
-use this command in terminal to run the test function with GPU support:python -c "from model.gclassifier import test_classifier; test_classifier()"
-"""
