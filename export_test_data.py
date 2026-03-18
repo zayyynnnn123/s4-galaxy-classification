@@ -101,3 +101,67 @@ linear_output.astype(np.float32).tofile('data/samples/linear_output.bin')
 hilbert_output.astype(np.float32).tofile('data/samples/linear_input.bin')
 
 print("Saved linear layer test data")
+
+# ---- S4D layer test data ----
+# we test s4_1 only, s4_2 and s4_3 follow the exact same pattern
+# input shape:  (4096, 64) -- output of uproject linear layer
+# output shape: (4096, 64) -- same shape, sequence transformed by SSM
+
+# get S4D layer 1 parameters -- attribute is s4_1 not s4_layers[0]
+s4d_layer = model.s4_1
+
+# extract each parameter as numpy float32
+s4d_log_dt     = s4d_layer.log_dt.detach().numpy().astype(np.float32)
+s4d_log_A_real = s4d_layer.log_A_real.detach().numpy().astype(np.float32)
+s4d_A_imag     = s4d_layer.A_imag.detach().numpy().astype(np.float32)
+s4d_C          = s4d_layer.C.detach().numpy().astype(np.float32)
+s4d_D          = s4d_layer.D.detach().numpy().astype(np.float32)
+
+print(f"S4D log_dt shape:     {s4d_log_dt.shape}")      # should be (64,)
+print(f"S4D log_A_real shape: {s4d_log_A_real.shape}")  # should be (64, 32)
+print(f"S4D A_imag shape:     {s4d_A_imag.shape}")      # should be (64, 32)
+print(f"S4D C shape:          {s4d_C.shape}")            # should be (64, 32, 2)
+print(f"S4D D shape:          {s4d_D.shape}")            # should be (64,)
+
+# save all parameters to binary files
+s4d_log_dt.tofile('data/samples/s4d_log_dt.bin')
+s4d_log_A_real.tofile('data/samples/s4d_log_A_real.bin')
+s4d_A_imag.tofile('data/samples/s4d_A_imag.bin')
+s4d_C.tofile('data/samples/s4d_C.bin')
+s4d_D.tofile('data/samples/s4d_D.bin')
+print("Saved S4D parameters")
+
+# the input to s4_1 is the output of uproject (linear layer)
+# linear_output is (4096, 64) meaning (L, H) layout
+# pytorch S4D expects (B, H, L) so we need to:
+#   1. convert to tensor
+#   2. transpose L and H dimensions
+#   3. add batch dimension
+linear_tensor  = torch.tensor(linear_output)                # (4096, 64) = (L, H)
+print(f"linear_tensor shape: {linear_tensor.shape}")
+
+# transposed=False means S4D expects (B, L, H) so just add batch dim
+s4d_input_BLH  = linear_tensor.unsqueeze(0)                 # (1, 4096, 64) = (B, L, H)
+print(f"S4D input to pytorch: {s4d_input_BLH.shape}")       # should be (1, 4096, 64)
+
+# save s4d input in (L, H) layout for C code
+linear_output.astype(np.float32).tofile('data/samples/s4d_input.bin')
+print(f"S4D input shape for C: {linear_output.shape}")      # (4096, 64)
+
+# run through pytorch s4_1 to get the reference output
+with torch.no_grad():
+    s4d_output_BLH, _ = s4d_layer(s4d_input_BLH)           # (1, 4096, 64)
+
+# squeeze batch dimension, output is already (L, H) because transposed=False
+s4d_output_LH = s4d_output_BLH.squeeze(0).numpy()          # (4096, 64)
+print(f"S4D output shape for C: {s4d_output_LH.shape}")     # (4096, 64)
+s4d_output_LH.astype(np.float32).tofile('data/samples/s4d_output.bin')
+
+print("Saved S4D test data:")
+print("  - data/samples/s4d_log_dt.bin")
+print("  - data/samples/s4d_log_A_real.bin")
+print("  - data/samples/s4d_A_imag.bin")
+print("  - data/samples/s4d_C.bin")
+print("  - data/samples/s4d_D.bin")
+print("  - data/samples/s4d_input.bin")
+print("  - data/samples/s4d_output.bin")
