@@ -184,4 +184,25 @@ void softmax_forward(const float* logits, float* probs);
  */
 void take_last_timestep(const float* sequence, float* last, int L);
 
+/* ------------------------------------------------------------------ */
+/* full model forward pass and weight loader                          */
+/* implemented in nn.c                                                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * load_model_weights -- reads all parameters from model_weights.bin
+ * must be called once before model_forward
+ * returns 0 on success, -1 on failure
+ * path : path to model_weights.bin */
+int load_model_weights(const char* path);
+
+/*
+ * model_forward -- runs complete inference pipeline on one image
+ * input_image  : flat (H,W,C) float array channel-last layout
+ * C            : number of channels, must be 3 for this model
+ * output_probs : output array of NUM_CLASSES probabilities summing to 1 */
+void model_forward(float* input_image, int C, float* output_probs);
+
+
+
 #endif /* NN_H */

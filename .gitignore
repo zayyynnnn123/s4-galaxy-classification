@@ -85,4 +85,10 @@ model_params/
 # ==========================================
 docs/
 .temp/
-solution/
+solution/c/main
+c/test_hilbert
+c/test_linear
+c/test_s4d
+c/test_gelu
+c/test_softmax
+c/test_tlts

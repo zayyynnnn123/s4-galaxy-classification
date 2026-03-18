@@ -24,7 +24,7 @@ files = [
     'fc.bias.bin'
 ]
 
-with open('../model_weights.bin', 'wb') as outfile:
+with open('model_weights.bin', 'wb') as outfile:
     for fname in files:
         with open(f'model_params/{fname}', 'rb') as infile:
             outfile.write(infile.read())
