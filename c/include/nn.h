@@ -203,6 +203,17 @@ int load_model_weights(const char* path);
  * output_probs : output array of NUM_CLASSES probabilities summing to 1 */
 void model_forward(float* input_image, int C, float* output_probs);
 
+/* ------------------------------------------------------------------ */
+/* weight accessors for benchmarking                                  */
+/* ------------------------------------------------------------------ */
+int32_t*   get_hilbert_indices(void);
+float*     get_uproject_weight(void);
+float*     get_uproject_bias(void);
+S4DParams* get_s4_1_params(void);
+S4DParams* get_s4_2_params(void);
+S4DParams* get_s4_3_params(void);
+float*     get_fc_weight(void);
+float*     get_fc_bias(void);
 
 
 #endif /* NN_H */

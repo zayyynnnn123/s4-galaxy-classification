@@ -249,4 +249,15 @@ void model_forward(float* input_image, int C, float* output_probs) {
 
     /* step 11: softmax (4,) -> (4,) probabilities */
     softmax_forward(buf_logits, output_probs);
+
+
 }
+/* weight accessors for benchmarking -- returns pointers to static arrays */
+float*     get_uproject_weight(void) { return uproject_weight; }
+int32_t*   get_hilbert_indices(void) { return hilbert_indices; }
+S4DParams* get_s4_1_params(void)     { return &s4_1_params; }
+float*     get_uproject_bias(void)   { return uproject_bias; }
+S4DParams* get_s4_3_params(void)     { return &s4_3_params; }
+S4DParams* get_s4_2_params(void)     { return &s4_2_params; }
+float*     get_fc_bias(void)         { return fc_bias; }
+float*     get_fc_weight(void)       { return fc_weight; }

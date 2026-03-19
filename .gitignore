@@ -92,3 +92,9 @@ c/test_s4d
 c/test_gelu
 c/test_softmax
 c/test_tlts
+c/benchmark
+c/benchmark_O0
+c/benchmark_O1
+c/benchmark_O2
+c/benchmark_O3
+c/benchmark_Ofast
