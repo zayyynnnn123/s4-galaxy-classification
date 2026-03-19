@@ -1,4 +1,4 @@
-.PHONY: clean check test_hilbert test_linear test_s4d test_gelu test_softmax test_tlts
+.PHONY: clean check test_hilbert test_linear test_s4d test_gelu test_softmax test_tlts test_end_to_end
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -I./include
@@ -31,7 +31,10 @@ test_tlts: tests/test_tlts.c src/tlts.c
 	$(CC) $(CFLAGS) -o test_tlts $^ $(LDFLAGS)
 	./test_tlts
 
+test_end_to_end: tests/test_end_to_end.c src/nn.c src/hilbert.c src/linear.c src/s4d.c src/gelu.c src/softmax.c src/tlts.c
+	$(CC) $(CFLAGS) -o test_end_to_end $^ $(LDFLAGS)
+
 check: test_hilbert test_linear test_s4d test_gelu test_softmax test_tlts
 
 clean:
-	rm -f main test test_hilbert test_linear test_s4d test_gelu test_softmax test_tlts
+	rm -f main test test_hilbert test_linear test_s4d test_gelu test_softmax test_tlts test_end_to_end
